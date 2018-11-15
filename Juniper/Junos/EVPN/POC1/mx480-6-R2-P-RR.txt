@@ -1,0 +1,133 @@
+chassis {
+    network-services enhanced-ip;
+}
+interfaces {
+    xe-0/0/0 {
+        description -to-R3-MX480-7-;
+        unit 0 {
+            family inet {
+                address 2.3.0.2/30;
+            }
+        }
+    }
+    xe-0/1/0 {
+        description -to-R1-MX204-5-;
+        unit 0 {
+            family inet {
+                address 11.2.0.2/30;
+            }
+        }
+    }
+    xe-0/1/1 {
+        description -to-R2-MX204-6-;
+        unit 0 {
+            family inet {
+                address 12.2.0.2/30;
+            }
+        }
+    }
+    lo0 {
+        unit 0 {
+            family inet {
+                address 2.2.2.2/32;
+            }
+        }
+    }
+}
+forwarding-options {
+    hash-key {
+        family multiservice {
+            payload {
+                ip {
+                    layer-3;
+                }
+            }
+        }
+    }
+}
+routing-options {
+    router-id 2.2.2.2;
+    autonomous-system 100;
+    forwarding-table {
+        export lbpp;
+    }
+}
+protocols {
+    rsvp {
+        interface xe-0/0/0.0 {
+            link-protection;
+        }
+        interface xe-0/1/0.0 {
+            link-protection;
+        }
+        interface xe-0/1/1.0 {
+            link-protection;
+        }
+    }
+    mpls {
+        interface all;
+        interface fxp0.0 {
+            disable;
+        }
+    }
+    bgp {
+        group Internal {
+            type internal;
+            local-address 2.2.2.2;
+            family inet-vpn {
+                unicast;
+            }
+            family evpn {
+                signaling;
+            }
+            family route-target;
+            cluster 2.2.2.2;
+            multipath;
+            neighbor 1.1.1.1;
+            neighbor 1.1.2.2;
+            neighbor 3.3.3.3;
+        }
+    }
+    ospf {
+        traffic-engineering;
+        area 0.0.0.0 {
+            interface xe-0/0/0.0 {
+                interface-type p2p;
+            }
+            interface xe-0/1/0.0 {
+                interface-type p2p;
+            }
+            interface xe-0/1/1.0 {
+                interface-type p2p;
+            }
+            interface lo0.0 {
+                passive;
+            }
+        }
+    }
+    ldp {
+        interface xe-0/0/0.0 {
+            link-protection;
+        }
+        interface xe-0/1/0.0 {
+            link-protection;
+        }
+        interface xe-0/1/1.0 {
+            link-protection;
+        }
+        session-protection;
+    }
+    lldp {
+        interface all;
+        interface fxp0 {
+            disable;
+        }
+    }
+}
+policy-options {
+    policy-statement lbpp {
+        then {
+            load-balance per-packet;
+        }
+    }
+}

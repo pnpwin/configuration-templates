@@ -1,0 +1,98 @@
+chassis {
+    aggregated-devices {
+        ethernet {
+            device-count 10;
+        }
+    }
+}
+interfaces {
+    xe-1/0/0 {
+        description -ae-to-mx204-5-R1-1-PE-;
+        ether-options {
+            802.3ad ae0;
+        }
+    }
+    xe-1/0/1 {
+        description -ae-to-mx204-6-R1-2-PE-;
+        ether-options {
+            802.3ad ae0;
+        }
+    }
+    xe-1/0/2 {
+        description -to-Spirent-8-2-;
+        unit 0 {
+            family ethernet-switching {
+                interface-mode trunk;
+                vlan {
+                    members all;
+                }
+            }
+        }
+    }
+    ae0 {
+        description -to-mx204-5-6-MH-LAG-;
+        aggregated-ether-options {
+            lacp {
+                active;
+                periodic fast;
+            }
+        }
+        unit 0 {
+            family ethernet-switching {
+                interface-mode trunk;
+                vlan {
+                    members all;
+                }
+            }
+        }
+    }
+}
+forwarding-options {
+    hash-key {
+        family multiservice {
+            source-mac;
+            destination-mac;
+            payload {
+                ip {
+                    layer-3;
+                }
+            }
+        }
+    }
+    enhanced-hash-key {
+        family inet {
+            type-of-service;
+        }
+    }
+}
+routing-options {
+    forwarding-table {
+        export lbpp;
+    }
+}
+protocols {
+    lldp {
+        interface all;
+        interface fxp0 {
+            disable;
+        }
+    }
+}
+policy-options {
+    policy-statement lbpp {
+        then {
+            load-balance per-packet;
+        }
+    }
+}
+vlans {
+    vlan_200 {
+        vlan-id 200;
+    }
+    vlan_201 {
+        vlan-id 201;
+    }
+    vlan_300 {
+        vlan-id 300;
+    }
+}

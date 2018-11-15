@@ -1,0 +1,231 @@
+chassis {
+    aggregated-devices {
+        ethernet {
+            device-count 1;
+        }
+    }
+    network-services enhanced-ip;
+}
+interfaces {
+    xe-0/1/0 {
+        description -to-P-router-MX480-6-;
+        unit 0 {
+            family inet {
+                address 11.2.0.1/30;
+            }
+        }
+    }
+    xe-0/1/1 {
+        apply-groups-except isis-mpls;
+        description -to-CE-EX9200-1-;
+        ether-options {
+            802.3ad ae0;
+        }
+    }
+    ae0 {
+        description -LAG-to-CE-;
+        flexible-vlan-tagging;
+        encapsulation flexible-ethernet-services;
+        esi {
+            00:00:00:00:00:00:00:00:11:11;
+            all-active;
+        }
+        aggregated-ether-options {
+            lacp {
+                active;
+                periodic fast;
+                system-id 00:00:00:1a:c0:02;
+            }
+        }
+        unit 200 {
+            encapsulation vlan-bridge;
+            vlan-id 200;
+        }
+        unit 201 {
+            encapsulation vlan-bridge;
+            vlan-id 201;
+        }
+    }
+    irb {
+        unit 200 {
+            family inet {
+                address 200.0.1.1/16;
+            }
+            mac 00:00:02:00:01:01;
+        }
+        unit 201 {
+            family inet {
+                address 201.0.1.1/16;
+            }
+            mac 00:00:02:01:01:01;
+        }
+    }
+    lo0 {
+        unit 0 {
+            family inet {
+                address 1.1.1.1/32;
+            }
+        }
+    }
+}
+forwarding-options {
+    hash-key {
+        family multiservice {
+            payload {
+                ip {
+                    layer-3;
+                }
+            }
+        }
+    }
+}
+routing-options {
+    router-id 1.1.1.1;
+    autonomous-system 100;
+    forwarding-table {
+        export lbpp;
+        dynamic-list-next-hop;
+    }
+}
+protocols {
+    rsvp {
+        interface xe-0/1/0.0 {
+            link-protection;
+        }
+    }
+    mpls {
+        label-switched-path lsp-R1-1-to-R1-2 {
+            from 1.1.1.1;
+            to 1.1.2.2;
+        }
+		label-switched-path lsp-R1-1-to-R3 {
+            from 1.1.1.1;
+            to 3.3.3.3;
+        }
+        interface xe-0/1/0.0;
+    }
+    bgp {
+        group Internal {
+            type internal;
+            local-address 1.1.1.1;
+            family inet-vpn {
+                unicast;
+            }
+            family evpn {
+                signaling;
+            }
+            family route-target;
+            multipath;
+            neighbor 2.2.2.2;
+        }
+    }
+    ospf {
+        traffic-engineering;
+        area 0.0.0.0 {
+            interface xe-0/1/0.0 {
+                interface-type p2p;
+            }
+            interface lo0.0 {
+                passive;
+            }
+        }
+    }
+    ldp {
+        interface xe-0/1/0.0 {
+            link-protection;
+        }
+        session-protection;
+    }
+    lldp {
+        interface all;
+        interface fxp0 {
+            disable;
+        }
+    }
+}
+policy-options {
+    policy-statement IP-VPN-ADD-COMM {
+        term Balancer-host-route {
+            from {
+                route-filter 200.0.1.10/32 exact;
+            }
+            then {
+                community add COMM-L3VPN-Clients;
+                community add COMM-EVPN-Site-1;
+                community add COMM-IPVPN-EVPN;
+                accept;
+            }
+        }
+        term EVPN-routes {
+            from {
+                route-filter 200.0.0.0/16 prefix-length-range /32-/32;
+                route-filter 201.0.0.0/16 prefix-length-range /32-/32;
+            }
+            then {
+                community add COMM-EVPN-Site-1;
+                community add COMM-IPVPN-EVPN;
+                accept;
+            }
+        }
+        term All-other {
+            then accept;
+        }
+    }
+    policy-statement IP-VPN-DISCARD-EVPN {
+        term Discard-EVPN-Redundand {
+            from community COMM-EVPN-Site-1;
+            then reject;
+        }
+        term Accept-IpVPN-from-Site-3 {
+            from community COMM-IPVPN-EVPN;
+            then accept;
+        }
+        term Accept-L3VPN-Clients {
+            from community COMM-L3VPN-Clients;
+            then accept;
+        }
+    }
+    policy-statement lbpp {
+        then {
+            load-balance per-packet;
+        }
+    }
+    community COMM-EVPN-Site-1 members target:2:1234;
+    community COMM-IPVPN-EVPN members target:2:400;
+    community COMM-L3VPN-Clients members target:3:300;
+}
+routing-instances {
+    EVPN_vlan_200 {
+        instance-type evpn;
+        vlan-id 200;
+        interface ae0.200;
+        routing-interface irb.200;
+        route-distinguisher 1.1.1.1:200;
+        vrf-target target:2:200;
+        protocols {
+            evpn {
+                default-gateway do-not-advertise;
+            }
+        }
+    }
+    EVPN_vlan_201 {
+        instance-type evpn;
+        vlan-id 201;
+        interface ae0.201;
+        routing-interface irb.201;
+        route-distinguisher 1.1.1.1:201;
+        vrf-target target:2:201;
+        protocols {
+            evpn;
+        }
+    }
+    L3VPN_for_EVPN {
+        instance-type vrf;
+        interface irb.200;
+        interface irb.201;
+        route-distinguisher 1.1.1.1:300;
+        vrf-import IP-VPN-DISCARD-EVPN;
+        vrf-export IP-VPN-ADD-COMM;
+        vrf-table-label;
+    }
+}
