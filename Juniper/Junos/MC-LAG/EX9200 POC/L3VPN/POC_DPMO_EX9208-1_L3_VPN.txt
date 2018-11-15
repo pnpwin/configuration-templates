@@ -1,0 +1,435 @@
+## Last changed: 2016-05-24 21:03:40 CEST
+version 14.2R6.5;
+groups {
+    re0 {
+        system {
+            host-name ex9208-1-re0;
+            backup-router 172.30.179.1 destination 172.30.176.0/20;
+        }
+        interfaces {
+            fxp0 {
+                unit 0 {
+                    family inet {
+                        address 172.30.179.151/24;
+                        address 172.30.179.150/24 {
+                            master-only;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    re1 {
+        system {
+            host-name ex9208-1-re1;
+            backup-router 172.30.179.1 destination 172.30.176.0/20;
+        }
+        interfaces {
+            fxp0 {
+                unit 0 {
+                    family inet {
+                        address 172.30.179.152/24;
+                        address 172.30.179.150/24 {
+                            master-only;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    dhcp-relay-group {
+        routing-instances {
+            <*> {
+                forwarding-options {
+                    dhcp-relay {
+                        overrides {
+                            allow-snooped-clients;
+                            always-write-giaddr;
+                            always-write-option-82;
+                            layer2-unicast-replies;
+                            trust-option-82;
+                        }
+                        relay-option-82 {
+                            circuit-id {
+                                prefix {
+                                    routing-instance-name;
+                                }
+                                no-vlan-interface-name;
+                            }
+                        }
+                        server-group {
+                            dhcp-server-1 {
+                                192.168.200.2;
+                                192.168.200.3;
+                            }
+                        }
+                        active-server-group dhcp-server-1;
+                        route-suppression {
+                            destination;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    vrf-mc-lag-group {
+        routing-instances {
+            <*> {
+                instance-type vrf;
+                vrf-import Import-DPMO_L3VPN;
+                vrf-export Export-DPMO_L3VPN-MC-LAG;
+                vrf-table-label;
+            }
+        }
+    }
+    vrf-single-homed-group {
+        routing-instances {
+            <*> {
+                instance-type vrf;
+                vrf-import Import-DPMO_L3VPN;
+                vrf-export Export-DPMO_L3VPN-SH;
+                vrf-table-label;
+            }
+        }
+    }
+}
+apply-groups [ re0 re1 ];
+chassis {
+    aggregated-devices {
+        ethernet {
+            device-count 3;
+        }
+    }
+}
+interfaces {
+    xe-0/0/0 {
+        description -To-EX9208-2-xe-0/0/0-;
+        ether-options {
+            802.3ad ae0;
+        }
+    }
+    xe-0/0/1 {
+        description -To-EX9208-2-xe-0/0/1-;
+        ether-options {
+            802.3ad ae0;
+        }
+    }
+    xe-0/0/2 {
+        description -To-EX9208-2-xe-0/0/2-;
+        disable;
+        ether-options {
+            802.3ad ae1;
+        }
+    }
+    xe-0/0/3 {
+        description -To-EX9208-2-xe-0/0/3-;
+        ether-options {
+            802.3ad ae1;
+        }
+    }
+    xe-0/0/4 {
+        description -To-EX4550-9-xe-0/0/0-MC-LAG-ae2-;
+        hold-time up 120000 down 1;
+        ether-options {
+            802.3ad ae2;
+        }
+    }
+    xe-0/0/5 {
+        description -To-EX4550-9-xe-0/0/1-single-homed-clients-;
+        unit 0 {
+            family ethernet-switching {
+                interface-mode trunk;
+                vlan {
+                    members 1000-1099;
+                }
+            }
+        }
+    }
+    xe-0/1/0 {
+        description -To-MX104-17-xe-2/0/0-core-;
+        mtu 9192;
+        unit 0 {
+            family inet {
+                address 10.0.0.14/30;
+            }
+            family mpls;
+        }
+    }
+    ae0 {
+        description -To-EX9208-2-ae0-ICCP-;
+        mtu 9192;
+        aggregated-ether-options {
+            lacp {
+                active;
+                periodic fast;
+            }
+        }
+        unit 0 {
+            family inet {
+                address 10.0.0.21/30;
+            }
+            family mpls;
+        }
+    }
+    ae1 {
+        description -To-EX9208-2-ae1-ICL-PL-;
+        mtu 9192;
+        aggregated-ether-options {
+            lacp {
+                active;
+                periodic slow;
+            }
+        }
+        unit 0 {
+            family ethernet-switching {
+                interface-mode trunk;
+                vlan {
+                    members all;
+                }
+            }
+        }
+    }
+    ae2 {
+        description -To-EX4550-9-xe_0_0_4_MC_LAG-;
+        mtu 9192;
+        aggregated-ether-options {
+            no-flow-control;
+            link-speed 10g;
+            lacp {
+                active;
+                periodic slow;
+                system-priority 1;
+                system-id 4c:96:14:5b:5f:c0;
+                admin-key 1;
+            }
+            mc-ae {
+                mc-ae-id 1;
+                redundancy-group 1;
+                chassis-id 0;
+                mode active-standby;
+                status-control active;
+                switchover-mode revertive;
+                revert-time 3;
+                init-delay-time 240;
+                events {
+                    iccp-peer-down {
+                        prefer-status-control-active;
+                    }
+                }
+            }
+        }
+        unit 0 {
+            family ethernet-switching {
+                interface-mode trunk;
+                vlan {
+                    members 1200-1455;
+                }
+            }
+        }
+    }
+    irb {
+        arp-l2-validate;
+        unit 1000 {
+            family inet {
+                address 192.168.0.1/25;
+            }
+        }
+        unit 1200 {
+            family inet {
+                address 192.168.100.125/25 {
+                    arp 192.168.100.126 l2-interface ae1.0 mac 4c:96:14:5b:07:f0;
+                    vrrp-group 0 {
+                        virtual-address 192.168.100.1;
+                        priority 250;
+                        fast-interval 300;
+                        preempt {
+                            hold-time 240;
+                        }
+                        accept-data;
+                        track {
+                            priority-hold-time 90;
+                            interface xe-0/1/0 {
+                                priority-cost 8;
+                            }
+                            interface ae0 {
+                                priority-cost 8;
+                            }
+                        }
+                        advertisements-threshold 3;
+                    }
+                }
+            }
+        }
+    }
+    lo0 {
+        unit 0 {
+            family inet {
+                address 192.179.0.150/32 {
+                    preferred;
+                }
+            }
+        }
+    }
+}
+routing-options {
+    static {
+        route 172.16.0.0/12 {
+            next-hop 172.30.179.1;
+            no-readvertise;
+        }
+    }
+    router-id 192.179.0.150;
+    route-distinguisher-id 192.179.0.150;
+    autonomous-system 100;
+    forwarding-table {
+        export Load_balance;
+    }
+}
+protocols {
+    mpls {
+        interface xe-0/1/0.0;
+    }
+    bgp {
+        group Internal {
+            type internal;
+            local-address 192.179.0.150;
+            family inet {
+                unicast;
+            }
+            family inet-vpn {
+                unicast;
+            }
+            neighbor 192.177.0.99 {
+                inactive: bfd-liveness-detection {
+                    minimum-interval 300;
+                    multiplier 3;
+                }
+            }
+        }
+    }
+    ospf {
+        traffic-engineering;
+        area 0.0.0.0 {
+            interface xe-0/1/0.0 {
+                node-link-protection;
+            }
+            interface lo0.0;
+            interface ae0.0 {
+                link-protection;
+            }
+        }
+    }
+    ldp {
+        interface xe-0/1/0.0 {
+            link-protection;
+        }
+        interface ae0.0 {
+            link-protection;
+        }
+        interface lo0.0;
+        session-protection;
+    }
+    vrrp {
+        asymmetric-hold-time;
+        skew-timer-disable;
+    }
+    iccp {
+        local-ip-addr 192.179.0.150;
+        session-establishment-hold-time 60;
+        peer 192.179.0.182 {
+            redundancy-group-id-list 1;
+            backup-liveness-detection {
+                backup-peer-ip 172.30.179.182;
+            }
+            liveness-detection {
+                minimum-interval 1000;
+                multiplier 3;
+            }
+        }
+    }
+}
+policy-options {
+    policy-statement Export-DPMO_L3VPN-MC-LAG {
+        term 1 {
+            then {
+                local-preference add 200;
+                community add comm-users-mc-lag-ex9200-1;
+                accept;
+            }
+        }
+        term 2 {
+            then reject;
+        }
+    }
+    policy-statement Export-DPMO_L3VPN-SH {
+        term 1 {
+            then {
+                community add comm-users-sh-ex9200-1;
+                accept;
+            }
+        }
+        term 2 {
+            then reject;
+        }
+    }
+    policy-statement Import-DPMO_L3VPN {
+        term 1 {
+            from {
+                protocol bgp;
+                community comm-from-hub-mx104-1;
+            }
+            then accept;
+        }
+        term 2 {
+            then reject;
+        }
+    }
+    policy-statement Load_balance {
+        term 1 {
+            then {
+                load-balance per-packet;
+            }
+        }
+    }
+    community comm-from-hub-mx104-1 members target:192.177.0.99:1;
+    community comm-users-mc-lag-ex9200-1 members [ target:192.179.0.150:200 target:192.177.0.99:1 ];
+    community comm-users-sh-ex9200-1 members [ target:192.179.0.150:100 target:192.177.0.99:1 ];
+}
+routing-instances {
+    apply-groups dhcp-relay-group;
+    User_MC_LAG_vlan_1200_VRF {
+        apply-groups vrf-mc-lag-group;
+        interface irb.1200;
+        forwarding-options {
+            dhcp-relay {
+                group group-1 {
+                    interface irb.1200;
+                }
+            }
+        }
+    }
+    User_SH_vlan_1000_VRF {
+        apply-groups vrf-single-homed-group;
+        interface irb.1000;
+        forwarding-options {
+            dhcp-relay {
+                group group-1 {
+                    interface irb.1000;
+                }
+            }
+        }
+    }
+}
+switch-options {
+    service-id 1;
+}
+vlans {
+    Vlan_MC_LAG_1200 {
+        vlan-id 1200;
+        l3-interface irb.1200;
+    }
+    Vlan_SH_1000 {
+        vlan-id 1000;
+        l3-interface irb.1000;
+    }
+}aggregated
