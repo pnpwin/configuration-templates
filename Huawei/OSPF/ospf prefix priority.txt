@@ -1,0 +1,12 @@
+sys
+ip ip-prefix backbone permit 10.100.128.0 24 gr 30 le 31
+ip ip-prefix backbone permit 10.100.129.0 24 gr 30 le 31
+ip ip-prefix backbone permit 10.100.127.0 24 gr 32
+ip ip-prefix backbone permit 10.100.0.0 24 gr 32
+ip ip-prefix backbone permit 10.100.1.0 24 gr 30 le 31
+ospf 1
+prefix-priority high ip-prefix backbone
+quit
+ret 
+save
+y

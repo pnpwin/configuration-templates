@@ -1,0 +1,7 @@
+router bgp 65000
+address-family vpnv4
+bgp additional-paths install
+exit
+address-family ipv4 vrf VRFNAME
+maximum-paths ibgp 2
+end

@@ -1,0 +1,10 @@
+system-view
+bgp 65500
+ipv4-family vpnv4
+auto-frr
+quit
+ipv4-family vpn-instance 
+auto-frr
+maximum load-balancing ibgp 2
+quit
+commit

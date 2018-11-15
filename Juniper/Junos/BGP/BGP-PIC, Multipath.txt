@@ -1,0 +1,6 @@
+set groups bgp-multipath-ec routing-instances <*> routing-options multipath
+set routing-instances VRFNAME apply-groups bgp-multipath-ec
+#
+set routing-options protect core
+set groups bgp-pic-edge routing-instances <*> routing-options protect core
+set routing-instances VRFNAME apply-groups bgp-pic-edge

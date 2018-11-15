@@ -1,0 +1,26 @@
+group ibgp-multipath-ec
+ router bgp '.*'
+  vrf '.*'
+   address-family ipv4 unicast
+    maximum-paths ibgp 2
+   !
+  !
+ !
+end-group
+group bgp-pic-edge
+ router bgp '.*'
+  vrf '.*'
+   address-family ipv4 unicast
+    additional-paths selection route-policy PL-BGP-PIC-EDGE
+   !
+  !
+ !
+end-group
+!
+route-policy PL-BGP-PIC-EDGE
+  set path-selection backup 1 install
+end-policy
+root
+apply-group ibgp-multipath-ec
+apply-group bgp-pic-edge
+end
