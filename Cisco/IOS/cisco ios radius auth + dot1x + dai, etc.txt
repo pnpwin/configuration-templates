@@ -1,0 +1,175 @@
+hostname test_c3750
+!
+!
+enable secret 5 ***
+!
+username *** privilege 15 secret 5 ***
+!
+!
+aaa new-model
+!
+!
+aaa server radius dynamic-author
+ client 1.1.1.1 server-key test
+ client 2.2.2.2 server-key test
+!
+aaa group server radius ISE
+ server-private 1.1.1.1 auth-port 1645 acct-port 1646 key test
+ server-private 2.2.2.2 auth-port 1645 acct-port 1646 key test
+ load-balance method least-outstanding batch-size 5
+!
+aaa authentication login default none
+aaa authentication login CONSOLE group radius local enable none
+aaa authentication login VTY group radius local enable none
+aaa authentication enable default group radius enable none
+aaa authentication dot1x default group radius
+aaa authorization console
+aaa authorization exec default none 
+aaa authorization exec VTY group radius local 
+aaa authorization exec CONSOLE group radius local 
+aaa authorization network default group radius 
+aaa accounting dot1x default start-stop group radius
+aaa accounting exec default start-stop group radius
+!         
+!
+aaa session-id common
+clock timezone MSK 3
+ip domain-lookup source-interface Vlan 666
+ip domain-name domain.ru
+ip name-server 1.1.1.1
+ip name-server 2.2.2.2
+!
+!
+ip dhcp snooping vlan 1-4094
+ip dhcp snooping database ftp://10.10.10.10/upload/dhcp-snooping-database/
+ip dhcp snooping database write-delay 60
+ip dhcp snooping database timeout 30
+ip dhcp snooping
+ip arp inspection vlan 1-4094
+!
+!
+!
+dot1x system-auth-control
+!
+!
+!
+errdisable recovery cause udld
+errdisable recovery cause bpduguard
+errdisable recovery cause security-violation
+errdisable recovery cause channel-misconfig (STP)
+errdisable recovery cause pagp-flap
+errdisable recovery cause dtp-flap
+errdisable recovery cause link-flap
+errdisable recovery cause sfp-config-mismatch
+errdisable recovery cause gbic-invalid
+errdisable recovery cause l2ptguard
+errdisable recovery cause psecure-violation
+errdisable recovery cause port-mode-failure
+errdisable recovery cause dhcp-rate-limit
+errdisable recovery cause pppoe-ia-rate-limit
+errdisable recovery cause mac-limit
+errdisable recovery cause vmps
+errdisable recovery cause storm-control
+errdisable recovery cause inline-power
+errdisable recovery cause arp-inspection
+errdisable recovery cause loopback
+errdisable recovery cause small-frame
+errdisable recovery interval 60
+archive
+ path ftp://10.10.10.10/upload/configurations/$h-$t
+ write-memory
+!
+spanning-tree mode rapid-pvst
+spanning-tree extend system-id
+spanning-tree vlan 1-4094 priority 61440
+!
+vlan internal allocation policy ascending
+!
+vlan 666
+ name admin
+!
+vlan 401
+ name users
+!
+vlan 500
+ name voip
+!
+lldp run
+!
+ip ftp source-interface Vlan666
+ip tftp source-interface Vlan666
+!
+!
+!
+interface FastEthernet1/0/1
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ ip arp inspection trust
+ ip dhcp snooping trust
+!
+interface FastEthernet1/0/48
+ switchport mode access
+ switchport voice vlan 500
+ switchport port-security maximum 3
+ authentication event fail action next-method
+ authentication host-mode multi-auth
+ authentication order dot1x mab
+ authentication priority dot1x mab
+ authentication port-control auto
+ authentication periodic
+ authentication timer reauthenticate server
+ authentication violation restrict
+ mab
+ dot1x pae authenticator
+ dot1x timeout server-timeout 30
+ dot1x timeout tx-period 3
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+ ip verify source port-security 
+!
+interface Vlan1
+ no ip address
+ shutdown
+!
+interface Vlan666
+ ip address 10.20.30.40 255.255.255.0
+!
+ip default-gateway 10.20.30.254
+no ip classless
+no ip http server
+no ip http secure-server
+!
+!
+!
+radius-server attribute 6 on-for-login-auth
+radius-server attribute 6 support-multiple
+radius-server attribute 8 include-in-access-req
+radius-server attribute 31 mac format ietf
+radius-server dead-criteria time 3 tries 3
+radius-server host 1.1.1.1 auth-port 1645 acct-port 1646 key test
+radius-server host 2.2.2.2 auth-port 1645 acct-port 1646 key test
+radius-server deadtime 30
+radius-server vsa send accounting
+radius-server vsa send authentication
+!
+!
+line con 0
+ authorization exec CONSOLE
+ login authentication CONSOLE
+line vty 0 4
+ session-timeout 30 
+ exec-timeout 30 0
+ authorization exec VTY
+ login authentication VTY
+ transport input all
+line vty 5 15
+ session-timeout 30 
+ exec-timeout 30 0
+ authorization exec VTY
+ login authentication VTY
+ transport input all
+!         
+ntp clock-period 36029721
+ntp server 1.1.1.1
+ntp server 2.2.2.2
+end
