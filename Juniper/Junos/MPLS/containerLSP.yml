@@ -339,7 +339,7 @@ routing-options {
         m9-p1 srlg-value 100104;
         kr01-p2--sdc-p2 srlg-value 101103;
     }
-	aggregate {
+    aggregate {
         defaults {
             discard;
         }
@@ -380,7 +380,7 @@ protocols {
         interface xe-0/2/8.0;
         interface xe-0/2/9.0;
     }
-	mpls {
+    mpls {
         statistics {
             file auto-bw size 10m;
             interval 10;
@@ -411,7 +411,7 @@ protocols {
                 resignal-minimum-bandwidth;
             }
         }
-		container-label-switched-path kr01-p2 {
+        container-label-switched-path kr01-p2 {
             apply-groups container-lsp;
             to 10.100.0.101;
         }
@@ -443,7 +443,7 @@ protocols {
         interface xe-0/2/8.0;
         interface xe-0/2/9.0;
     }
-	ospf {
+    ospf {
         spf-options {
             delay 50;
             holddown 5000;
@@ -494,7 +494,7 @@ protocols {
             }
         }
     }
-	ldp {
+    ldp {
         auto-targeted-session;
         track-igp-metric;
         mtu-discovery;
@@ -514,7 +514,7 @@ protocols {
         interface lo0.0;
         session-protection;
     }
-	oam {
+    oam {
         ethernet {
             link-fault-management {
                 action-profile link-adjacency-loss {
