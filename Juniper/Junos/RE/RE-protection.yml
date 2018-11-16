@@ -1,0 +1,1046 @@
+policy-options {
+    prefix-list multicast-all-routers {
+        224.0.0.2/32;
+    }
+    prefix-list multicast-all-ospf-routers {
+        224.0.0.5/32;
+        224.0.0.6/32;
+       }
+    prefix-list vrrp {
+        224.0.0.18/32;
+    }
+    prefix-list p2p {
+        1.1.1.1/31;
+    }
+    prefix-list lo0-ipv4 {
+        apply-path "interfaces lo0 unit 0 family inet address <*>";
+    }
+    prefix-list router-ipv4 {
+        apply-path "interfaces <*> unit <*> family inet address <*>";
+    }
+    prefix-list bgp-neighbors {
+        apply-path "protocols bgp group <*> neighbor <*>";
+    }
+    prefix-list iccp-neighbors {
+        apply-path "protocols iccp peer <*>";
+    }
+    prefix-list iccp-backup-neighbors {
+        apply-path "protocols iccp peer <*> backup-liveness-detection backup-peer-ip <*>";
+    }
+    prefix-list iccp-local {
+        apply-path "protocols iccp local-ip-addr <*>";
+    }
+    prefix-list dns-servers {
+        apply-path "system name-server <*>";
+    }
+    prefix-list dhcp-servers {
+        apply-path "routing-instances <*> forwarding-options dhcp-relay server-group <*> <*>";
+    }
+    prefix-list radius-servers {
+        apply-path "system radius-server <*>";
+    }
+    prefix-list ntp-servers {
+        apply-path "system ntp server <*>";
+    }
+    prefix-list ntp-peers {
+        apply-path "system ntp peer <*>";
+    }
+    prefix-list ntp-clients {
+        10.10.10.0/24;
+    }
+    prefix-list snmp-client-lists {
+        apply-path "snmp client-list <*> <*>";
+    }
+    prefix-list snmp-community-clients {
+        apply-path "snmp community <*> clients <*>";
+    }
+    prefix-list management-infrastructure-vpn {
+        2.2.2.2/24;
+    }
+    prefix-list management-infrastructure {
+        3.3.3.3/32;
+    }
+    prefix-list localhost {
+        127.0.0.1/32;
+    }
+    prefix-list rfc1918 {
+        10.0.0.0/8;
+        172.16.0.0/12;
+        192.168.0.0/16;
+    }
+}
+    firewall {
+        policer 1mbps {
+            if-exceeding {
+                bandwidth-limit 1m;
+                burst-size-limit 16k;
+            }
+            then discard;
+        }
+        policer 5mbps {
+            if-exceeding {
+                bandwidth-limit 5m;
+                burst-size-limit 16k;
+            }
+            then discard;
+        }
+        family inet {
+            prefix-action management-police-set {
+                apply-flags omit;
+                policer 1mbps;
+                count;
+                filter-specific;
+                subnet-prefix-length 24;
+                destination-prefix-length 32;
+            }
+            prefix-action management-high-police-set {
+                apply-flags omit;
+                policer 5mbps;
+                count;
+                filter-specific;
+                subnet-prefix-length 24;
+                destination-prefix-length 32;
+            }
+            filter accept-bgp {
+                apply-flags omit;
+                term accept-bgp {
+from {
+                        source-prefix-list {
+                            bgp-neighbors;
+                    }
+                    protocol tcp;
+                    port bgp;
+                }
+                then {
+                    count accept-bgp;
+                    accept;
+                }
+            }
+        }
+        filter accept-ospf {
+            apply-flags omit;
+            term accept-ospf {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        multicast-all-ospf-routers;
+                        router-ipv4;
+                    }
+                    protocol ospf;
+                }
+                then {
+                    count accept-ospf;
+                    accept;
+                }
+            }
+        }
+        filter accept-vrrp {
+            apply-flags omit;
+            term accept-vrrp {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        vrrp;
+                    }
+                    protocol [ vrrp ah ];
+                }
+                then {
+                    count accept-vrrp;
+                    accept;
+                }
+            }
+        }
+        filter accept-ssh {
+        apply-flags omit;
+            term accept-ssh {
+                from {
+                    source-prefix-list {
+                        management-infrastructure;
+                        management-infrastructure-vpn;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol tcp;
+                    destination-port ssh;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-ssh;
+                    accept;
+                }
+            }
+            term accept-netconf {
+                from {
+                    source-prefix-list {
+                        management-infrastructure;
+                        management-infrastructure-vpn;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol tcp;
+                    destination-port 830;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-netconf;
+                    accept;
+                }
+            }
+        }
+        filter accept-telnet {
+            apply-flags omit;
+            term accept-telnet {
+                from {
+                    source-prefix-list {
+                        management-infrastructure;
+                        management-infrastructure-vpn;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol tcp;
+                    destination-port telnet;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-telnet;
+                    accept;
+                }
+            }
+        }
+        filter accept-snmp {
+            apply-flags omit;
+            term accept-snmp {
+                from {
+                    source-prefix-list {
+                        snmp-client-lists;
+                        snmp-community-clients;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    destination-port snmp;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-snmp;
+                    accept;
+                }
+            }
+        }
+        filter accept-ntp {
+            apply-flags omit;
+            term accept-ntp-servers {
+                from {
+                    source-prefix-list {
+                        ntp-servers;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    port ntp;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-ntp-servers;
+                    accept;
+                }
+            }
+            term accept-ntp-peers {
+                from {
+                    source-prefix-list {
+                        ntp-peers;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    destination-port ntp;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-ntp-peers;
+                    accept;
+                }
+            }
+            term accept-ntp-clients {
+                from {
+                    source-prefix-list {
+                        ntp-clients;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    destination-port ntp;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-ntp-clients;
+                    accept;
+                }
+            }
+            term accept-ntp-local {
+                from {
+                    source-prefix-list {
+                        lo0-ipv4;
+                    }
+                    protocol udp;
+                    destination-port ntp;
+                }
+                then {
+                    count accept-ntp-local;
+                    accept;
+                }
+            }
+        }
+        filter discard-all {
+            apply-flags omit;
+            term discard-ip-options {
+                from {
+                    ip-options any;
+                }
+                then {
+                    count discard-ip-options;
+                    log;
+                    syslog;
+                    discard;
+                }
+            }
+            term discard-TTL_1-unknown {
+                from {
+                    ttl 1;
+                }
+                then {
+                    count discard-all-TTL_1-unknown;
+                    log;
+                    syslog;
+                    discard;
+                }
+            }
+            term discard-tcp {
+                from {
+                    protocol tcp;
+                }
+                then {
+                    count discard-tcp;
+                    log;
+                    syslog;
+                    discard;
+                }
+            }
+            term discard-netbios {
+                from {
+                    protocol udp;
+                    destination-port 137;
+                }
+                then {
+                    count discard-netbios;
+                    log;
+                    syslog;
+                    discard;
+                }
+            }
+            term discard-udp {
+                from {
+                    protocol udp;
+                }
+                then {
+                    count discard-udp;
+                    log;
+                    syslog;
+                    discard;
+                }
+            }
+            term discard-icmp {
+                from {
+                    protocol icmp;
+                }
+                then {
+                    count discard-icmp;
+                    log;
+                    syslog;
+                    discard;
+                }
+            }
+            term discard-unknown {
+                then {
+                    count discard-unknown;
+                    log;
+                    syslog;
+                    discard;
+                }
+            }
+        }
+        filter accept-traceroute {
+            apply-flags omit;
+            term accept-traceroute-udp {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    ttl 1;
+                    destination-port 33435-33450;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-traceroute-udp;
+                    accept;
+                }
+            }
+            term accept-traceroute-icmp {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol icmp;
+                    ttl 1;
+                    icmp-type [ echo-request timestamp time-exceeded ];
+                }
+                then {
+                    policer 1mbps;
+                    count accept-traceroute-icmp;
+                accept;
+                }
+            }
+            term accept-traceroute-tcp {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol tcp;
+                    ttl 1;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-traceroute-tcp;
+                    accept;
+                }
+            }
+        }
+        filter accept-igp {
+            apply-flags omit;
+            term accept-ospf {
+                filter accept-ospf;
+            }
+        }
+        filter accept-common-services {
+            apply-flags omit;
+            term accept-icmp {
+                filter accept-icmp;
+            }
+            term accept-traceroute {
+                filter accept-traceroute;
+            }
+            term accept-ssh {
+                filter accept-ssh;
+            }
+            term accept-snmp {
+                filter accept-snmp;
+            }
+            term accept-ntp {
+                filter accept-ntp;
+            }
+            term accept-dns {
+                filter accept-dns;
+            }
+            term accept-dhcp {
+                filter accept-dhcp;
+            }
+        }
+        filter accept-bfd {
+            apply-flags omit;
+            term accept-sh-bfd {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    source-port 49152-65535;
+                    destination-port 3784-3785;
+                }
+                then {
+                    count accept-sh-bfd;
+                    accept;
+                }
+            }
+        }
+        filter accept-iccp {
+            apply-flags omit;
+            term accept-iccp-control {
+                from {
+                    source-prefix-list {
+                        iccp-neighbors;
+                        iccp-backup-neighbors;
+                    }
+                    destination-prefix-list {
+                        iccp-local;
+                    }
+                    protocol tcp;
+                    destination-port 102;
+                }
+                then {
+                    count accept-iccp-control;
+                    accept;
+                }
+            }
+            term accept-iccp-in {
+                from {
+                    source-prefix-list {
+                        iccp-neighbors;
+                        iccp-backup-neighbors;
+                    }
+                    destination-prefix-list {
+                        iccp-local;
+                    }
+                    protocol tcp;
+                    source-port 33012;
+                }
+                then {
+                    count accept-iccp-in;
+                    accept;
+                }
+            }
+            term accept-iccp-out {
+                from {
+                    source-prefix-list {
+                        iccp-local;
+                    }
+                    destination-prefix-list {
+                        iccp-neighbors;
+                        iccp-backup-neighbors;
+                    }
+                    protocol tcp;
+                    destination-port 33012;
+                }
+                then {
+                    count accept-iccp-out;
+                    accept;
+                }
+            }
+            term accept-iccp-mh-bfd {
+                from {
+                    source-prefix-list {
+                        iccp-neighbors;
+                        iccp-backup-neighbors;
+                    }
+                    destination-prefix-list {
+                        iccp-local;
+                    }
+                    protocol udp;
+                    source-port 49152-65535;
+                    destination-port 4784;
+                }
+                then {
+                    count accept-iccp-mh-bfd;
+                    accept;
+                }
+            }
+            term accept-iccp-bld {
+                from {
+                    source-prefix-list {
+                        iccp-neighbors;
+                        iccp-backup-neighbors;
+                    }
+                    destination-prefix-list {
+                        iccp-local;
+                    }
+                    protocol udp;
+                    source-port 50015;
+                    destination-port 50015;
+                }
+                then {
+                    count accept-iccp-bld;
+                    accept;
+                }
+            }
+        }
+        filter accept-ldp {
+            apply-flags omit;
+            term accept-ldp-discover {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        multicast-all-routers;
+                    }
+                    protocol udp;
+                    destination-port ldp;
+                }
+                then {
+                    count accept-ldp-discover;
+                    accept;
+                }
+            }
+            term accept-ldp-unicast {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                        lo0-ipv4;
+                    }
+                    protocol tcp;
+                    port ldp;
+                }
+                then {
+                    count accept-ldp-unicast;
+                    accept;
+                }
+            }
+            term accept-tldp-discover {
+                from {
+                    destination-prefix-list {
+                        lo0-ipv4;
+                    }
+                    protocol udp;
+                    destination-port ldp;
+                }
+                then {
+                    count accept-tldp-discover;
+                    accept;
+                }
+            }
+            term accept-tldp-unicast {
+                from {
+                    destination-prefix-list {
+                        lo0-ipv4;
+                    }
+                    protocol tcp;
+                    port ldp;
+                }
+                then {
+                    count accept-tldp-unicast;
+                    accept;
+                }
+            }
+            term accept-ldp-igmp {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        multicast-all-routers;
+                    }
+                    protocol igmp;
+                }
+                then {
+                    count accept-ldp-igmp;
+                    accept;
+                }
+            }
+        }
+        filter accept-rsvp {
+            apply-flags omit;
+            term accept-rsvp {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol rsvp;
+                }
+                then {
+                    count accept-rsvp;
+                    accept;
+                }
+            }
+        }
+        filter accept-ftp {
+            apply-flags omit;
+            term accept-ftp {
+                from {
+                    source-prefix-list {
+                        management-infrastructure;
+                        management-infrastructure-vpn;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol tcp;
+                    port [ ftp ftp-data ];
+                }
+                then {
+                    policer 5mbps;
+                    count accept-ftp;
+                    accept;
+                }
+            }
+        }
+        filter accept-radius {
+            apply-flags omit;
+            term accept-radius {
+                from {
+                    source-prefix-list {
+                        radius-servers;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    source-port [ radacct radius ];
+                    tcp-established;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-radius;
+                    accept;
+                }
+            }
+        }
+        filter accept-remote-auth {
+            apply-flags omit;
+            term accept-radius {
+                filter accept-radius;
+            }
+        }
+        filter accept-dns {
+            apply-flags omit;
+            term accept-dns {
+                from {
+                    source-prefix-list {
+                        dns-servers;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol [ udp tcp ];
+                    source-port 53;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-dns;
+                    accept;
+                }
+            }
+        }
+        filter accept-dhcp {
+            apply-flags omit;
+            term accept-dhcp-clients-discovering {
+                from {
+                    source-address {
+                        0.0.0.0/32;
+                    }
+                    destination-address {
+                        255.255.255.255/32;
+                    }
+                    protocol udp;
+                    source-port bootpc;
+                    destination-port bootps;
+                    }
+                then {
+                    policer 1mbps;
+                    count accept-dhcp-clients-discovering;
+                    accept;
+                }
+            }
+            term accept-dhcp-servers {
+                from {
+                    protocol udp;
+                    source-prefix-list {
+                        dhcp-servers;
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        dhcp-servers;
+                        router-ipv4;
+                    }
+                    source-port [ bootps bootpc ];
+                    destination-port [ bootps bootpc ];
+                }
+                then {
+                    policer 1mbps;
+                    count accept-dhcp-servers;
+                    accept;
+                }
+            }
+            term accept-dhcp-clients-renewing {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        dhcp-servers;
+                    }
+                    protocol udp;
+                    destination-port bootps;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-dhcp-clients-renewing;
+                    accept;
+                }
+            }
+            term accept-dhcp-clients-rebinding {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-address {
+                        255.255.255.255/32;
+                    }
+                    protocol udp;
+                    destination-port bootps;
+                    destination-port bootpc;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-dhcp-clients-rebinding;
+                    accept;
+                }
+            }
+            term accept-dhcp-relay-broadcast {
+                from {
+                    source-prefix-list {
+                        dhcp-servers;
+                    }
+                    destination-address {
+                        255.255.255.255/32;
+                    }
+                    protocol udp;
+                    source-port bootps;
+                    destination-port bootpc;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-dhcp-relay-broadcast;
+                    accept;
+                }
+            }
+        }
+        filter accept-ldp-rsvp {
+            apply-flags omit;
+            term accept-ldp {
+                filter accept-ldp;
+            }
+            term accept-rsvp {
+                filter accept-rsvp;
+            }
+        }
+        filter accept-established {
+            apply-flags omit;
+            term accept-established-tcp-ssh {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    source-port ssh;
+                    tcp-established;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-established-tcp-ssh;
+                    accept;
+                }
+            }
+            term accept-established-tcp-ftp {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    source-port ftp;
+                    tcp-established;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-established-tcp-ftp;
+                    accept;
+                }
+            }
+            term accept-established-tcp-ftp-data-syn {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    source-port ftp-data;
+                    tcp-initial;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-established-tcp-ftp-data-syn;
+                    accept;
+                }
+            }
+            term accept-established-tcp-ftp-data {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    source-port ftp-data;
+                    tcp-established;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-established-tcp-ftp-data;
+                    accept;
+                }
+            }
+            term accept-established-tcp-telnet {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    source-port telnet;
+                    tcp-established;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-established-tcp-telnet;
+                    accept;
+                }
+            }
+            term accept-established-tcp-fetch {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    source-port [ http https ];
+                    tcp-established;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-established-tcp-fetch;
+                    accept;
+                }
+            }
+            term accept-established-udp-ephemeral {
+                from {
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    destination-port 49152-65535;
+                }
+                then {
+                    policer 5mbps;
+                    count accept-established-udp-ephemeral;
+                    accept;
+                }
+            }
+        }
+        filter accept-all {
+            apply-flags omit;
+            term accept-all-tcp {
+                from {
+                    protocol tcp;
+                }
+                then {
+                    count accept-all-tcp;
+                    log;
+                    syslog;
+                    accept;
+                }
+            }
+            term accept-all-udp {
+                from {
+                    protocol udp;
+                }
+                then {
+                    count accept-all-udp;
+                    log;
+                    syslog;
+                    accept;
+                }
+            }
+            term accept-all-igmp {
+                from {
+                    protocol igmp;
+                }
+                then {
+                    count accept-all-igmp;
+                    log;
+                    syslog;
+                    accept;
+                }
+            }
+            term accept-icmp {
+                from {
+                    protocol icmp;
+                }
+                then {
+                    count accept-all-icmp;
+                    log;
+                    syslog;
+                    accept;
+                }
+            }
+            term accept-all-unknown {
+                then {
+                    count accept-all-unknown;
+                    log;
+                    syslog;
+                    accept;		
+                }
+            }
+        }
+        filter accept-icmp {
+            apply-flags omit;
+            term no-icmp-fragments {
+                from {
+                    is-fragment;
+                    protocol icmp;
+                }
+                then {
+                    count no-icmp-fragments;
+                    log;
+                    discard;
+                }
+            }
+            term accept-icmp {
+                from {
+                    protocol icmp;
+                    ttl-except 1;
+                    icmp-type [ echo-reply echo-request time-exceeded unreachable
+                    source-quench router-advertisement parameter-problem ];
+                }
+                then {
+                    policer 5mbps;
+                    count accept-icmp;
+                    accept;
+                }
+            }
+        }
+        filter discard-frags {
+            term 1 {
+                from {
+                    first-fragment;
+                }
+                then {
+                    count deny-first-frags;
+                    discard;
+                }
+            }
+            term 2 {
+                from {
+                    is-fragment;
+                }
+                then {
+                    count deny-other-frags;
+                    discard;
+                }
+            }
+        }
+    }
+}
+interfaces lo0 {
+    unit 0 {
+        family inet {
+            filter {
+                input-list [ discard-frags accept-bfd accept-iccp accept-igp accept-ldp-rsvp accept-bgp accept-vrrp accept-telnet accept-ftp accept-remote-auth accept-common-services accept-established discard-all ];
+            }
+        }
+    }
+}
