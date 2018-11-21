@@ -69,44 +69,30 @@ policy-options {
         192.168.0.0/16;
     }
 }
-    firewall {
-        policer 1mbps {
-            if-exceeding {
-                bandwidth-limit 1m;
-                burst-size-limit 16k;
-            }
-            then discard;
+firewall {
+    family inet {
+        prefix-action management-police-set {
+            apply-flags omit;
+            policer 1mbps;
+            count;
+            filter-specific;
+            subnet-prefix-length 24;
+            destination-prefix-length 32;
         }
-        policer 5mbps {
-            if-exceeding {
-                bandwidth-limit 5m;
-                burst-size-limit 16k;
-            }
-            then discard;
+        prefix-action management-high-police-set {
+            apply-flags omit;
+            policer 5mbps;
+            count;
+            filter-specific;
+            subnet-prefix-length 24;
+            destination-prefix-length 32;
         }
-        family inet {
-            prefix-action management-police-set {
-                apply-flags omit;
-                policer 1mbps;
-                count;
-                filter-specific;
-                subnet-prefix-length 24;
-                destination-prefix-length 32;
-            }
-            prefix-action management-high-police-set {
-                apply-flags omit;
-                policer 5mbps;
-                count;
-                filter-specific;
-                subnet-prefix-length 24;
-                destination-prefix-length 32;
-            }
-            filter accept-bgp {
-                apply-flags omit;
-                term accept-bgp {
-from {
-                        source-prefix-list {
-                            bgp-neighbors;
+        filter accept-bgp {
+            apply-flags omit;
+            term accept-bgp {
+                from {
+                    source-prefix-list {
+                        bgp-neighbors;
                     }
                     protocol tcp;
                     port bgp;
@@ -155,7 +141,7 @@ from {
             }
         }
         filter accept-ssh {
-        apply-flags omit;
+            apply-flags omit;
             term accept-ssh {
                 from {
                     source-prefix-list {
@@ -258,6 +244,7 @@ from {
                 from {
                     source-prefix-list {
                         ntp-peers;
+                        router-ipv4;
                     }
                     destination-prefix-list {
                         router-ipv4;
@@ -409,7 +396,7 @@ from {
                 then {
                     policer 1mbps;
                     count accept-traceroute-icmp;
-                accept;
+                    accept;
                 }
             }
             term accept-traceroute-tcp {
@@ -740,7 +727,7 @@ from {
                     protocol udp;
                     source-port bootpc;
                     destination-port bootps;
-                    }
+                }
                 then {
                     policer 1mbps;
                     count accept-dhcp-clients-discovering;
@@ -750,14 +737,6 @@ from {
             term accept-dhcp-servers {
                 from {
                     protocol udp;
-                    source-prefix-list {
-                        dhcp-servers;
-                        router-ipv4;
-                    }
-                    destination-prefix-list {
-                        dhcp-servers;
-                        router-ipv4;
-                    }
                     source-port [ bootps bootpc ];
                     destination-port [ bootps bootpc ];
                 }
@@ -786,15 +765,14 @@ from {
             }
             term accept-dhcp-clients-rebinding {
                 from {
-                    source-prefix-list {
-                        router-ipv4;
-                    }
                     destination-address {
                         255.255.255.255/32;
                     }
+                    source-prefix-list {
+                        router-ipv4;
+                    }
                     protocol udp;
-                    destination-port bootps;
-                    destination-port bootpc;
+                    destination-port [ bootps bootpc ];
                 }
                 then {
                     policer 1mbps;
@@ -802,13 +780,48 @@ from {
                     accept;
                 }
             }
-            term accept-dhcp-relay-broadcast {
+            term accept-dhcp-clients-apipa {
                 from {
-                    source-prefix-list {
-                        dhcp-servers;
+                    source-address {
+                        169.254.0.0/16;
                     }
                     destination-address {
                         255.255.255.255/32;
+                    }
+                    protocol udp;
+                    source-port bootpc;
+                    destination-port bootps;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-dhcp-relay-apipa;
+                    accept;
+                }
+            }
+            term accept-dhcp-clients-relay {
+                from {
+                    source-prefix-list {
+                        router-ipv4;
+                    }
+                    destination-prefix-list {
+                        router-ipv4;
+                    }
+                    protocol udp;
+                    destination-port bootps;
+                }
+                then {
+                    policer 1mbps;
+                    count accept-dhcp-clients-renewing;
+                    accept;
+                }
+            }
+            term accept-dhcp-relay-broadcast {
+                from {
+                    destination-address {
+                        255.255.255.255/32;
+                    }
+                    source-prefix-list {
+                        dhcp-servers;
                     }
                     protocol udp;
                     source-port bootps;
@@ -982,7 +995,7 @@ from {
                     count accept-all-unknown;
                     log;
                     syslog;
-                    accept;		
+                    accept;
                 }
             }
         }
@@ -1003,8 +1016,7 @@ from {
                 from {
                     protocol icmp;
                     ttl-except 1;
-                    icmp-type [ echo-reply echo-request time-exceeded unreachable
-                    source-quench router-advertisement parameter-problem ];
+                    icmp-type [ echo-reply echo-request time-exceeded unreachable source-quench router-advertisement parameter-problem ];
                 }
                 then {
                     policer 5mbps;
@@ -1033,6 +1045,20 @@ from {
                 }
             }
         }
+    }
+    policer 1mbps {
+        if-exceeding {
+            bandwidth-limit 1m;
+            burst-size-limit 16k;
+        }
+        then discard;
+    }
+    policer 5mbps {
+        if-exceeding {
+            bandwidth-limit 5m;
+            burst-size-limit 16k;
+        }
+        then discard;
     }
 }
 interfaces lo0 {
