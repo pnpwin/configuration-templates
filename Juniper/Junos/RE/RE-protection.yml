@@ -772,7 +772,7 @@ firewall {
                         router-ipv4;
                     }
                     protocol udp;
-                    destination-port [ bootps bootpc ];
+                    destination-port bootps;
                 }
                 then {
                     policer 1mbps;
